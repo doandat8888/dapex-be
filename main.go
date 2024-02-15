@@ -64,6 +64,21 @@ var client *mongo.Client
 
 var secretKey = "76766d67364e35119f0c5a198a173fb980452ae08347a79c8e419239425bebcd"
 
+func getUserIdStr(r *http.Request, c *gin.Context) string {
+	//Get user id from token
+	reqToken := r.Header.Get("Authorization")
+	if reqToken == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "No bearer token provided"})
+		return ""
+	}
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	fmt.Println("Token: ", reqToken)
+	userIdStr := validateToken(reqToken, c)
+
+	return userIdStr
+}
+
 func connectDB() {
 	connectionString := "mongodb+srv://doantranbadat:NJpsmGtvzUuC0LLG@cluster0.6qe8hwu.mongodb.net"
 	clientOptions := options.Client().ApplyURI(connectionString)
@@ -209,18 +224,83 @@ func addNewTransaction(c *gin.Context) {
 	c.JSON(http.StatusCreated, newTransaction)
 }
 
-func getUserTransaction(r *http.Request, c *gin.Context) {
+func deleteTransaction(r *http.Request, c *gin.Context) {
 
-	//Get user id from token
-	reqToken := r.Header.Get("Authorization")
-	if reqToken == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "No bearer token provided"})
+	var transactionDel Transaction
+
+	if err := c.BindJSON(&transactionDel); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
-	splitToken := strings.Split(reqToken, "Bearer ")
-	reqToken = splitToken[1]
-	fmt.Println("Token: ", reqToken)
-	userIdStr := validateToken(reqToken, c)
+
+	filter := bson.M{
+		"_id":        transactionDel.ID,
+		"userId":     transactionDel.UserId,
+		"categoryId": transactionDel.CategoryId,
+		"typeId":     transactionDel.TypeId,
+		"amount":     transactionDel.Amount,
+	}
+
+	userIdStr := getUserIdStr(r, c)
+
+	userId, err := primitive.ObjectIDFromHex(userIdStr)
+	if err != nil {
+		// Xử lý lỗi khi chuyển đổi không thành công
+		fmt.Println("Error converting userIDString to ObjectID:", err)
+		return
+	}
+
+	if userId != transactionDel.UserId {
+		c.JSON(http.StatusBadRequest, "Unauthorized")
+		return
+	}
+
+	collection := client.Database("Dapex").Collection("transactions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := collection.DeleteOne(ctx, filter)
+	if err != nil {
+		fmt.Printf("Error deleting transaction: %v\n", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, "Delete successfully")
+	fmt.Println(result)
+}
+
+func updateTransaction(c *gin.Context) {
+	var transactionUpdate Transaction
+
+	if err := c.BindJSON(&transactionUpdate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	filter := bson.M{"_id": transactionUpdate.ID}
+
+	updateData := bson.M{
+		"$set": bson.M{
+			"amount": transactionUpdate.Amount,
+		},
+	}
+
+	collection := client.Database("Dapex").Collection("transactions")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := collection.UpdateOne(ctx, filter, updateData)
+	if err != nil {
+		fmt.Printf("Error deleting transaction: %v\n", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, transactionUpdate)
+}
+
+func getUserTransaction(r *http.Request, c *gin.Context) {
+
+	userIdStr := getUserIdStr(r, c)
 
 	userId, err := primitive.ObjectIDFromHex(userIdStr)
 	if err != nil {
@@ -302,7 +382,7 @@ func main() {
 	// Use CORS middleware
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"*"} // Replace with your allowed origins
-	config.AllowMethods = []string{"GET", "POST", "OPTIONS", "PUT", "DELETE"}
+	config.AllowMethods = []string{"GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"}
 	config.AllowHeaders = []string{"Authorization", "Content-Type"}
 	router.Use(cors.New(config))
 
@@ -311,6 +391,10 @@ func main() {
 	router.GET("/api/v1/categories", getAllCategory)
 	router.GET("/api/v1/types", getAllType)
 	router.POST("/api/v1/transaction", addNewTransaction)
+	router.PATCH("/api/v1/transaction", updateTransaction)
+	router.POST("/api/v1/transaction/delete", func(c *gin.Context) {
+		deleteTransaction(c.Request, c)
+	})
 	router.GET("api/v1/user/transactions", func(c *gin.Context) {
 		getUserTransaction(c.Request, c)
 	})
