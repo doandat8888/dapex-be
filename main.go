@@ -405,7 +405,7 @@ func main() {
 		port = envPort
 	}
 
-	log.Printf("Server is running on port 111 %s...", port)
+	log.Printf("Server is running on port %s...", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
