@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+package dapexbe;
+
+service DapexBe {
+    rpc GetAllCategories(GetAllCategoriesRequest) returns (GetAllCategoriesResponse);
+    rpc GetAllType(GetAllTypesRequest) returns (GetAllCategoriesResponse);
+    rpc AddNewTransaction(AddTransactionRequest) returns (Transaction);
+    rpc DeleteTransaction(DeleteTransactionRequest) returns (google.protobuf.Empty);
+    rpc UpdateTransaction(UpdateTransactionRequest) returns (Transaction);
+    rpc GetUserTransaction(GetUserTransactionRequest) returns (GetUserTransactionResponse);
+}
+
+message Category {
+    string id = 1;
+    string name = 2;
+    string label = 3;
+}
+
+message GetAllCategoriesRequest {}
+message GetAllCategoriesResponse {
+    repeated Category categories = 1;
+}
+
+message User {
+    string email = 1;
+    string name = 2;
+    string avt = 3;
+    string role = 4;
+}
+
+message Transaction {
+    string id = 1;
+    string userId = 2;
+    string categoryId = 3;
+    string typeId = 4;
+    int32 amount = 5;
+    google.protobuf.Timestamp createdAt = 6;
+}
+
+message AddTransactionRequest {
+    Transaction transaction = 1;
+}
+
+message DeleteTransactionRequest {
+    string userId = 1;
+    string transactionId = 2;
+}
+
+message UpdateTransactionRequest {
+    Transaction transaction = 1;
+}
+
+message Type {
+    string id = 1;
+    string name = 2;
+    string label = 3;
+}
+
+message GetAllTypesRequest {}
+message GetAllTypesResponse {
+    repeated Type types = 1;
+}
+
+message GetUserTransactionRequest {
+    string userId = 1;
+}
+
+message GetUserTransactionResponse {
+    repeated Transaction transactions = 1;
+}
+
+message Card {
+    string id = 1;
+    string user_id = 2;
+    string bank_id = 3;
+    google.protobuf.Timestamp expire_in = 4;
+    string number = 5;
+}
+
+message Bank {
+    string id = 1;
+    string name = 2;
+}
